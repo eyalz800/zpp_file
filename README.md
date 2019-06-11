@@ -1,0 +1,192 @@
+file
+====
+
+A simple implementation of cross platform file class.
+
+Motivation
+----------
+1. Easy to use.
+2. Direct system call error reporting using `std::system_error`.
+
+Example
+-------
+```cpp
+#include "zpp/file.h"
+#include <string_view>
+
+using namespace std::string_view_literals;
+
+int main()
+{
+    auto file = open("/tmp/file.txt", zpp::filesystem::open_mode::write);
+    file.write("Hello World"sv);
+    file.close();
+
+    auto data = open("/tmp/file.txt", zpp::filesystem::open_mode::read).read();
+
+    auto stdout = zpp::filesystem::weak_file(1);
+    stdout.write(data.data(), data.size());
+}
+```
+
+API
+---
+There are two main class aliases `zpp::filesystem::file` and `zpp::filesystem::weak_file`, both
+are a specialization of the `zpp::filesystem::basic_file` class.
+
+The `zpp::filesystem::file` class is an owning class, whereas the `zpp::filesystem::weak_file` is
+non-owning and can be constructed using a specific file handle or file descriptor without closing them.
+
+In order to open a file, use one of the following overloads.
+
+This overload is a passthrough to the platform API function, either `open` for Linux
+or `CreateFile` for Windows, with the same parameters and order.
+```cpp
+/**
+ * Open a file by path forwarding parameters to underlying platform
+ * specific API.
+ */
+template <typename Char, typename... Arguments>
+inline file open(const Char * path, Arguments... arguments)
+```
+
+This overload is a cross platform and more robust API to open a file.
+
+```cpp
+/**
+ * Open mode.
+ * - open_mode::read - read only, existing files only.
+ * - open_mode::write - write only, truncate file if exists, create if does
+ * not exist.
+ * - open_mode::append - write only, append to existing file, create if
+ * does not exist.
+ * - open_mode::read_write - read and write, existing files only.
+ * - open_mode::read_write_create - read and write, truncate file if
+ * exists, create if does not exist.
+ * - open_mode::read_write_append- read and write, append to existing file,
+ * create if does not exist.
+ */
+enum class open_mode
+{
+    read,
+    write,
+    append,
+    read_write,
+    read_write_create,
+    read_write_append,
+};
+
+/**
+ * Open a file by path using a simple cross platform interface.
+ */
+template <typename Char>
+inline file open(const Char * path, open_mode mode)
+```
+
+The class aliases `zpp::filesystem::file` and `zpp::filesystem::weak_file` contain
+the following API, which reports errors using `std::system_error`:
+```cpp
+/**
+ * Attempts to read exactly the amount of bytes requested.
+ * If not possible, an end_of_file_exception is thrown.
+ */
+void read_exact(void * data, std::size_t size) const;
+
+/**
+ * Attempts to write exactly the amount of bytes requested.
+ * If not possible, an insufficient_space_exception is thrown.
+ */
+void write_exact(const void * data, std::size_t size) const;
+
+/**
+ * Attempts to write exactly the amount of bytes requested.
+ * If not possible, an insufficient_space_exception is thrown.
+ * This overload is for string view.
+ */
+template <typename Type>
+void write_exact(std::basic_string_view<Type> string) const;
+
+/**
+ * Reads all requested bytes, unless the end of file is reached where
+ * the reading stops. Returns the data inside a vector of bytes.
+ * If the requested bytes are not specified, or set to zero, the
+ * function reads the entire file.
+ */
+std::vector<std::byte> read(std::size_t size = {}) const;
+
+/**
+ * Reads all requested bytes, unless the end of file is reached where
+ * the reading stops. The amount of bytes read is returned.
+ */
+std::size_t read(void * data, std::size_t size) const;
+
+/**
+ * Write all of the given data to the file. May return
+ * less bytes only if there is an insufficient space.
+ */
+std::size_t write(const void * data, std::size_t size) const;
+
+/**
+ * Write all of the given data to the file. May return less
+ * bytes only if there is an insufficient space.
+ * This overload is for string view.
+ */
+template <typename Type>
+std::size_t write(std::basic_string_view<Type> string) const;
+
+/**
+ * Reads from the file into the specified data byte array.
+ * Executes a single read operation which may return less bytes
+ * than requested. The amount of bytes read is returned.
+ * If zero is returned, the end of file is reached.
+ */
+std::size_t read_once(void * data, std::size_t size) const;
+
+/**
+ * Writes the given byte array to the file.
+ * Executes a single write operation which may write less bytes
+ * than requested. The amount of bytes written is returned.
+ * If zero is returned there is insufficient space.
+ */
+std::size_t write_once(const void * data, std::size_t size) const;
+
+/**
+ * Returns the file size.
+ */
+std::uint64_t size() const;
+
+/**
+ * Returns true if the file is empty, else false.
+ */
+bool empty() const;
+
+/**
+ * Seeks into the file the given number of bytes, according
+ * to the seek mode. Negative number of bytes is backward direction.
+ * Returns the previous file pointer.
+ */
+std::uint64_t seek(std::int64_t offset, seek_mode mode) const;
+
+/**
+ * Returns the current file pointer.
+ */
+std::uint64_t tell() const;
+
+/**
+ * Truncates the file to the given size.
+ * If the file is extended, the extended contents are unspecified.
+ * If this function fails, the file position is unspecified.
+ */
+void truncate(std::uint64_t size) const;
+
+/**
+ * Sync the file.
+ */
+void sync() const;
+
+/**
+ * Closes the file.
+ */
+void close();
+```
+
