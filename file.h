@@ -505,7 +505,7 @@ template <typename Type>
 std::size_t
 basic_file_base<File>::write(std::basic_string_view<Type> string) const
 {
-    return write(std::data(string), std::size(string));
+    return write(std::data(string), std::size(string) * sizeof(Type));
 }
 
 template <typename File>
@@ -613,7 +613,7 @@ template <typename Type>
 void basic_file_base<File>::write_exact(
     std::basic_string_view<Type> string) const
 {
-    if (auto result = write(string); result != string.size()) {
+    if (auto result = write(string); result != (string.size() * sizeof(Type))) {
         throw insufficient_space_exception(result);
     }
 }
