@@ -37,7 +37,7 @@ are a specialization of the `zpp::filesystem::basic_file` class.
 The `zpp::filesystem::file` class is an owning class, whereas the `zpp::filesystem::weak_file` is
 non-owning and can be constructed using a specific file handle or file descriptor without closing them.
 
-In order to open a file, use one of the following overloads.
+In order to open a file, use one of the following overloads:
 
 This overload is a passthrough to the platform API function, either `open` for Linux
 or `CreateFile` for Windows, with the same parameters and order.
@@ -47,7 +47,7 @@ or `CreateFile` for Windows, with the same parameters and order.
  * specific API.
  */
 template <typename Char, typename... Arguments>
-inline file open(const Char * path, Arguments... arguments)
+file open(const Char * path, Arguments... arguments)
 ```
 
 This overload is a cross platform and more robust API to open a file.
@@ -80,8 +80,12 @@ enum class open_mode
  * Open a file by path using a simple cross platform interface.
  */
 template <typename Char>
-inline file open(const Char * path, open_mode mode)
+file open(const Char * path, open_mode mode)
 ```
+
+In order to transfer ownership of a regular file descriptor/handle into
+a `zpp::filesystem::file`, create a `zpp::filesystem::file_handle` from the 
+descriptor/handle and pass it to `zpp::filesystem::file` during construction.
 
 The class aliases `zpp::filesystem::file` and `zpp::filesystem::weak_file` contain
 the following API, which reports errors using `std::system_error`:
@@ -188,5 +192,15 @@ void sync() const;
  * Closes the file.
  */
 void close();
+
+/**
+ * Returns the file handle.
+ */
+auto get() const;
+
+/**
+ * Releases ownership of the file handle.
+ */
+auto release();
 ```
 
