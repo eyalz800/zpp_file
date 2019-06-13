@@ -428,7 +428,7 @@ private:
 /**
  * Swaps between left file handle and right file handle.
  */
-inline void swap(file_handle & left, file_handle & right) noexcept
+void swap(file_handle & left, file_handle & right) noexcept
 {
     left.swap(right);
 }
@@ -642,7 +642,7 @@ std::size_t basic_file_base<File>::read_once(void * data,
 #ifdef ZPP_FILE_WINDOWS
     // The maximum bytes windows can read at once.
     static constexpr std::size_t max_read_size =
-        (std::numeric_limits<DWORD>::max)();
+        (std::numeric_limits<int>::max)();
 
     // The amount of bytes to read at this time.
     auto bytes_to_read =
@@ -689,7 +689,7 @@ std::size_t basic_file_base<File>::write_once(const void * data,
 #ifdef ZPP_FILE_WINDOWS
     // The maximum bytes windows can write at once.
     static constexpr std::size_t max_write_size =
-        (std::numeric_limits<DWORD>::max)();
+        (std::numeric_limits<int>::max)();
 
     // The amount of bytes to write at this time.
     auto bytes_to_write =
@@ -736,7 +736,7 @@ void basic_file_base<File>::close()
     // Release ownership of the handle.
     auto handle = derived().release();
 
-    // Close the handle.
+    // Close the handle handle.
     if (!CloseHandle(handle)) {
         throw std::system_error(
             GetLastError(), std::system_category(), "CloseHandle failed");
@@ -745,7 +745,7 @@ void basic_file_base<File>::close()
     // Release ownership of the file descriptor.
     auto fd = derived().release();
 
-    // Close the file descriptor,
+    // Close the local file descriptor,
     if (-1 == ::close(fd)) {
         throw std::system_error(
             errno, std::system_category(), "close failed");
@@ -923,7 +923,7 @@ std::uint64_t basic_file_base<File>::tell() const
  * specific API.
  */
 template <typename Char, typename... Arguments>
-inline file open(const Char * path, Arguments... arguments)
+file open(const Char * path, Arguments... arguments)
 {
 #ifdef ZPP_FILE_WINDOWS
     HANDLE result{};
@@ -985,7 +985,7 @@ enum class open_mode
  * Open a file by path using a simple cross platform interface.
  */
 template <typename Char>
-inline file open(const Char * path, open_mode mode)
+file open(const Char * path, open_mode mode)
 {
     static_assert(std::is_same_v<Char, char> ||
                       std::is_same_v<Char, wchar_t>,
