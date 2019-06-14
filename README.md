@@ -24,8 +24,8 @@ int main()
 
     auto data = open("/tmp/file.txt", zpp::filesystem::open_mode::read).read();
 
-    auto stdout = zpp::filesystem::weak_file(1);
-    stdout.write(data.data(), data.size());
+    auto stdout_file = zpp::filesystem::weak_file(1);
+    stdout_file.write(data);
 }
 ```
 
@@ -88,27 +88,22 @@ a `zpp::filesystem::file`, create a `zpp::filesystem::file_handle` from the
 descriptor/handle and pass it to `zpp::filesystem::file` during construction.
 
 The class aliases `zpp::filesystem::file` and `zpp::filesystem::weak_file` contain
-the following API, which reports errors using `std::system_error`:
+the following API, which reports errors using `std::system_error`.
+
+Note: the read and write APIs accept a `zpp::byte_view` or `zpp::cbyte_view` which
+are similar to span except they implicitly allow all byte types - `char, unsigned char, std::byte`.
 ```cpp
 /**
  * Attempts to read exactly the amount of bytes requested.
  * If not possible, an end_of_file_exception is thrown.
  */
-void read_exact(void * data, std::size_t size) const;
+void read_exact(byte_view data) const;
 
 /**
  * Attempts to write exactly the amount of bytes requested.
  * If not possible, an insufficient_space_exception is thrown.
  */
-void write_exact(const void * data, std::size_t size) const;
-
-/**
- * Attempts to write exactly the amount of bytes requested.
- * If not possible, an insufficient_space_exception is thrown.
- * This overload is for string view.
- */
-template <typename Type>
-void write_exact(std::basic_string_view<Type> string) const;
+void write_exact(cbyte_view data) const;
 
 /**
  * Reads all requested bytes, unless the end of file is reached where
@@ -122,21 +117,13 @@ std::vector<std::byte> read(std::size_t size = {}) const;
  * Reads all requested bytes, unless the end of file is reached where
  * the reading stops. The amount of bytes read is returned.
  */
-std::size_t read(void * data, std::size_t size) const;
+std::size_t read(byte_view data) const;
 
 /**
  * Write all of the given data to the file. May return
  * less bytes only if there is an insufficient space.
  */
-std::size_t write(const void * data, std::size_t size) const;
-
-/**
- * Write all of the given data to the file. May return less
- * bytes only if there is an insufficient space.
- * This overload is for string view.
- */
-template <typename Type>
-std::size_t write(std::basic_string_view<Type> string) const;
+std::size_t write(cbyte_view data) const;
 
 /**
  * Reads from the file into the specified data byte array.
@@ -144,7 +131,7 @@ std::size_t write(std::basic_string_view<Type> string) const;
  * than requested. The amount of bytes read is returned.
  * If zero is returned, the end of file is reached.
  */
-std::size_t read_once(void * data, std::size_t size) const;
+std::size_t read_once(byte_view data) const;
 
 /**
  * Writes the given byte array to the file.
@@ -152,7 +139,7 @@ std::size_t read_once(void * data, std::size_t size) const;
  * than requested. The amount of bytes written is returned.
  * If zero is returned there is insufficient space.
  */
-std::size_t write_once(const void * data, std::size_t size) const;
+std::size_t write_once(cbyte_view data) const;
 
 /**
  * Returns the file size.
