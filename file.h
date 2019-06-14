@@ -754,6 +754,12 @@ class basic_file : public detail::basic_file_base<
 {
 public:
     /**
+     * Become friends with all files.
+     */
+    template <typename, typename>
+    friend class basic_file;
+
+    /**
      * Invalid file handle value.
      */
     inline static const auto invalid_file_handle =
@@ -773,6 +779,16 @@ public:
      * Create a file from a handle.
      */
     basic_file(file_handle file_handle) : m_file(std::move(file_handle))
+    {
+    }
+
+    /**
+     * Create a file from another file if file handle is convertible.
+     */
+    template <typename OtherFileHandle>
+    basic_file(
+        const basic_file<OtherFileHandle, InvalidFileHandle> & other) :
+        m_file(other.m_file)
     {
     }
 
@@ -917,6 +933,14 @@ public:
      * Returns the weak file handle.
      */
     weak_file_handle get() const
+    {
+        return m_file;
+    }
+
+    /**
+     * Returns the weak file handle.
+     */
+    explicit operator weak_file_handle() const
     {
         return m_file;
     }
