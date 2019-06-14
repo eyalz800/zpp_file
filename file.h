@@ -28,23 +28,23 @@ namespace zpp
 /**
  * Represents a view of bytes.
  */
-template <typename Type>
+template <typename ByteType>
 class basic_byte_view
 {
 public:
     // Check that the underlying type is either char, unsigned char, or
     // std::byte.
     static_assert(
-        std::is_same_v<std::remove_cv_t<Type>, char> ||
-            std::is_same_v<std::remove_cv_t<Type>, unsigned char> ||
-            std::is_same_v<std::remove_cv_t<Type>, std::byte>,
+        std::is_same_v<std::remove_cv_t<ByteType>, char> ||
+            std::is_same_v<std::remove_cv_t<ByteType>, unsigned char> ||
+            std::is_same_v<std::remove_cv_t<ByteType>, std::byte>,
         "Byte type must either be char, unsigned char, or std::byte.");
     /**
      * Type definition.
      * @{
      */
-    using value_type = Type;
-    using const_value_type = std::add_const_t<Type>;
+    using value_type = ByteType;
+    using const_value_type = std::add_const_t<value_type>;
     using reference = std::add_lvalue_reference_t<value_type>;
     using const_reference = std::add_lvalue_reference_t<const_value_type>;
     using pointer = std::add_pointer_t<value_type>;
