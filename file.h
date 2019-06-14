@@ -6,7 +6,6 @@
 #include <iterator>
 #include <limits>
 #include <stdexcept>
-#include <string_view>
 #include <system_error>
 #include <type_traits>
 #include <utility>
@@ -21,6 +20,529 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#endif
+
+namespace zpp
+{
+#if !__has_include("zpp/byte_view.h")
+/**
+ * Represents a view of bytes.
+ */
+template <typename Type>
+class basic_byte_view
+{
+public:
+    // Check that the underlying type is either char, unsigned char, or
+    // std::byte.
+    static_assert(
+        std::is_same_v<std::remove_cv_t<Type>, char> ||
+            std::is_same_v<std::remove_cv_t<Type>, unsigned char> ||
+            std::is_same_v<std::remove_cv_t<Type>, std::byte>,
+        "Byte type must either be char, unsigned char, or std::byte.");
+    /**
+     * Type definition.
+     * @{
+     */
+    using value_type = Type;
+    using const_value_type = std::add_const_t<Type>;
+    using reference = std::add_lvalue_reference_t<value_type>;
+    using const_reference = std::add_lvalue_reference_t<const_value_type>;
+    using pointer = std::add_pointer_t<value_type>;
+    using const_pointer = std::add_pointer_t<const_value_type>;
+    using iterator = pointer;
+    using const_iterator = const_pointer;
+    using reverse_iterator = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    using index_type = std::size_t;
+    /**
+     * @}
+     */
+
+    /**
+     * Construct an empty byte view.
+     */
+    constexpr basic_byte_view() noexcept = default;
+
+    /**
+     * Construction of byte view for same byte ranges.
+     * @{
+     */
+    constexpr basic_byte_view(pointer begin, index_type count) noexcept :
+        m_data(begin),
+        m_size(count)
+    {
+    }
+
+    constexpr basic_byte_view(pointer begin, pointer end) noexcept :
+        basic_byte_view(begin, end - begin)
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Construction of byte view from different byte ranges.
+     * @{
+     */
+    template <typename Pointer,
+              // Make sure other pointer is not pointing to the same type
+              // current byte view type.
+              typename = std::enable_if_t<!std::is_same_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                  std::remove_cv_t<value_type>>>,
+
+              // Make sure the other pointer points to a byte type.
+              typename = std::enable_if_t<
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    basic_byte_view(Pointer begin, index_type count) noexcept :
+        m_data(reinterpret_cast<pointer>(begin)),
+        m_size(count)
+    {
+    }
+
+    template <typename Pointer,
+              // Make sure other pointer is not pointing to the same type
+              // current byte view type.
+              typename = std::enable_if_t<!std::is_same_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                  std::remove_cv_t<value_type>>>,
+
+              // Make sure the other pointer points to a byte type.
+              typename = std::enable_if_t<
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    basic_byte_view(Pointer begin, Pointer end) noexcept :
+        basic_byte_view(begin, end - begin)
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Explicit construction of byte views of non-byte ranges.
+     * @{
+     */
+    template <typename Pointer,
+              // Make sure the other pointer is not a byte type.
+              typename = std::enable_if_t<
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    explicit basic_byte_view(Pointer begin, index_type count) noexcept :
+        m_data(reinterpret_cast<pointer>(begin)),
+        m_size(count * sizeof(*begin))
+    {
+    }
+
+    template <typename Pointer,
+              // Make sure the other pointer is not a byte type.
+              typename = std::enable_if_t<
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    explicit basic_byte_view(Pointer begin, Pointer end) noexcept :
+        basic_byte_view(begin, end - begin)
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Explicit construction of byte views from void pointer ranges.
+     * @{
+     */
+    template <typename Pointer,
+              // Make sure the other pointer is void type.
+              typename = std::enable_if_t<std::is_void_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>, typename = void, typename = void>
+    explicit basic_byte_view(Pointer begin, index_type count) noexcept :
+        m_data(static_cast<pointer>(begin)),
+        m_size(count)
+    {
+    }
+
+    template <typename Pointer,
+              // Make sure the other pointer is void type.
+              typename = std::enable_if_t<std::is_void_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>, typename = void, typename = void, typename = void>
+    explicit basic_byte_view(Pointer begin, Pointer end) noexcept :
+        basic_byte_view(
+            begin, Pointer(std::uintptr_t(end) - std::uintptr_t(begin)))
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Construction from other byte views whose underlying type is
+     * convertible (CV qualification).
+     * @{
+     */
+    template <typename OtherByteType,
+              typename = std::enable_if_t<
+                  std::is_convertible_v<std::add_pointer_t<OtherByteType>,
+                                        pointer>>>
+    constexpr basic_byte_view(
+        const basic_byte_view<OtherByteType> & other) noexcept :
+        m_data(other.m_data),
+        m_size(other.m_size)
+    {
+    }
+
+    template <typename OtherByteType,
+              typename = std::enable_if_t<
+                  std::is_convertible_v<std::add_pointer_t<OtherByteType>,
+                                        pointer>>>
+    constexpr basic_byte_view(
+        basic_byte_view<OtherByteType> && other) noexcept :
+        m_data(other.m_data),
+        m_size(other.m_size)
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Construct from other byte views with non convertible underlying
+     * type.
+     */
+    template <typename OtherByteType,
+              typename = std::enable_if_t<
+                  !std::is_convertible_v<std::add_pointer_t<OtherByteType>,
+                                         pointer>>, typename = void>
+    basic_byte_view(
+        const basic_byte_view<OtherByteType> & other) noexcept :
+        m_data(reinterpret_cast<pointer>(other.m_data)),
+        m_size(other.m_size)
+    {
+    }
+
+    /**
+     * Construct from containers/string/array of byte types.
+     * @{
+     */
+    template <typename Type,
+              // The pointer type.
+              typename Pointer = decltype(std::declval<Type>().data()),
+
+              // Make sure the container is random access (that together
+              // with a data() member function is probably enough to
+              // require contiguous).
+              typename = std::enable_if_t<std::is_base_of_v<
+                  std::random_access_iterator_tag,
+                  typename std::iterator_traits<decltype(
+                      std::declval<Type>().begin())>::iterator_category>>,
+
+              // Make sure other pointer is pointing to the same type
+              // current byte view type.
+              typename = std::enable_if_t<std::is_same_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                  std::remove_cv_t<value_type>>>,
+
+              // Make sure the other pointer points to a byte type.
+              typename = std::enable_if_t<
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    constexpr basic_byte_view(Type && value) noexcept :
+        basic_byte_view(value.data(), value.size())
+    {
+    }
+
+    template <typename Type,
+              // The pointer type.
+              typename Pointer = decltype(std::declval<Type>().data()),
+
+              // Make sure the container is random access (that together
+              // with a data() member function is probably enough to
+              // require contiguous).
+              typename = std::enable_if_t<std::is_base_of_v<
+                  std::random_access_iterator_tag,
+                  typename std::iterator_traits<decltype(
+                      std::declval<Type>().begin())>::iterator_category>>,
+
+              // Make sure other pointer is not pointing to the same type
+              // current byte view type.
+              typename = std::enable_if_t<!std::is_same_v<
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                  std::remove_cv_t<value_type>>>,
+
+              // Make sure the other pointer points to a byte type.
+              typename = std::enable_if_t<
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> ||
+                  std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>, typename = void>
+    basic_byte_view(Type && value) noexcept :
+        basic_byte_view(value.data(), value.size())
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Explicitly construct from containers/string/array of non byte types.
+     * @{
+     */
+    template <typename Type,
+              // The pointer type.
+              typename Pointer = decltype(std::declval<Type>().data()),
+
+              // Make sure the container is random access (that together
+              // with a data() member function is probably enough to
+              // require contiguous).
+              typename = std::enable_if_t<std::is_base_of_v<
+                  std::random_access_iterator_tag,
+                  typename std::iterator_traits<decltype(
+                      std::declval<Type>().begin())>::iterator_category>>,
+
+              // Make sure the other pointer does not point to a byte type.
+              typename = std::enable_if_t<
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      unsigned char> &&
+                  !std::is_same_v<
+                      std::remove_cv_t<std::remove_pointer_t<Pointer>>,
+                      std::byte>>>
+    explicit basic_byte_view(Type && value) noexcept :
+        basic_byte_view(value.data(), value.size())
+    {
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Assignment and swap.
+     * @{
+     */
+    constexpr basic_byte_view & operator=(basic_byte_view other) noexcept
+    {
+        other.swap(*this);
+        return *this;
+    }
+    constexpr void swap(basic_byte_view & other) noexcept
+    {
+        std::swap(m_data, other.m_data);
+        std::swap(m_size, other.m_size);
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Accessing a byte at a specific index.
+     * @{
+     */
+    constexpr reference operator[](index_type index)
+    {
+        return m_data[index];
+    }
+    constexpr reference operator[](index_type index) const
+    {
+        return m_data[index];
+    }
+    reference at(index_type index)
+    {
+        if (index >= m_size) {
+            throw std::out_of_range("byte view access out of range");
+        }
+        return m_data[index];
+    }
+    reference at(index_type index) const
+    {
+        if (index >= m_size) {
+            throw std::out_of_range("byte view access out of range");
+        }
+        return m_data[index];
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Accessing front and back.
+     * @{
+     */
+    constexpr reference front()
+    {
+        return *m_data;
+    }
+    constexpr reference front() const
+    {
+        return *m_data;
+    }
+    constexpr reference back()
+    {
+        return *(m_data + m_size - 1);
+    }
+    constexpr reference back() const
+    {
+        return *(m_data + m_size - 1);
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Return the byte view data and size.
+     * @{
+     */
+    constexpr pointer data()
+    {
+        return m_data;
+    }
+    constexpr pointer data() const
+    {
+        return m_data;
+    }
+    constexpr index_type size() const
+    {
+        return m_size;
+    }
+    constexpr bool empty() const
+    {
+        return !m_size;
+    }
+    /**
+     * @}
+     */
+
+    /**
+     * Iteration support.
+     * @{
+     */
+    constexpr iterator begin()
+    {
+        return m_data;
+    }
+    constexpr iterator begin() const
+    {
+        return m_data;
+    }
+    constexpr const_iterator cbegin() const
+    {
+        return m_data;
+    }
+    constexpr reverse_iterator rbegin()
+    {
+        return reverse_iterator(end());
+    }
+    constexpr const_reverse_iterator rbegin() const
+    {
+        return const_reverse_iterator(end());
+    }
+    constexpr const_reverse_iterator crbegin() const
+    {
+        return const_reverse_iterator(end());
+    }
+    constexpr iterator end()
+    {
+        return m_data + m_size;
+    }
+    constexpr iterator end() const
+    {
+        return m_data + m_size;
+    }
+    constexpr const_iterator cend() const
+    {
+        return m_data + m_size;
+    }
+    constexpr reverse_iterator rend()
+    {
+        return reverse_iterator(begin());
+    }
+    constexpr reverse_iterator rend() const
+    {
+        return reverse_iterator(begin());
+    }
+    constexpr const_reverse_iterator crend() const
+    {
+        return reverse_iterator(begin());
+    }
+    /**
+     * @}
+     */
+
+private:
+    /**
+     * Pointer to the byte view beginning.
+     */
+    pointer m_data{};
+
+    /**
+     * Size of the byte view.
+     */
+    index_type m_size{};
+};
+
+/**
+ * Swap between left and right byte views.
+ */
+template <typename Type>
+constexpr void swap(basic_byte_view<Type> & left,
+                    basic_byte_view<Type> & right) noexcept
+{
+    left.swap(right);
+}
+
+/**
+ * Byte view aliases.
+ * @{
+ */
+using byte_view = basic_byte_view<std::byte>;
+using cbyte_view = basic_byte_view<const std::byte>;
+/**
+ * @}
+ */
+} // namespace zpp
 #endif
 
 namespace zpp::filesystem
@@ -51,21 +573,13 @@ public:
      * Attempts to read exactly the amount of bytes requested.
      * If not possible, an end_of_file_exception is thrown.
      */
-    void read_exact(void * data, std::size_t size) const;
+    void read_exact(byte_view data) const;
 
     /**
      * Attempts to write exactly the amount of bytes requested.
      * If not possible, an insufficient_space_exception is thrown.
      */
-    void write_exact(const void * data, std::size_t size) const;
-
-    /**
-     * Attempts to write exactly the amount of bytes requested.
-     * If not possible, an insufficient_space_exception is thrown.
-     * This overload is for string view.
-     */
-    template <typename Type>
-    void write_exact(std::basic_string_view<Type> string) const;
+    void write_exact(cbyte_view data) const;
 
     /**
      * Reads all requested bytes, unless the end of file is reached where
@@ -79,21 +593,13 @@ public:
      * Reads all requested bytes, unless the end of file is reached where
      * the reading stops. The amount of bytes read is returned.
      */
-    std::size_t read(void * data, std::size_t size) const;
+    std::size_t read(byte_view data) const;
 
     /**
      * Write all of the given data to the file. May return
      * less bytes only if there is an insufficient space.
      */
-    std::size_t write(const void * data, std::size_t size) const;
-
-    /**
-     * Write all of the given data to the file. May return less
-     * bytes only if there is an insufficient space.
-     * This overload is for string view.
-     */
-    template <typename Type>
-    std::size_t write(std::basic_string_view<Type> string) const;
+    std::size_t write(cbyte_view data) const;
 
     /**
      * Reads from the file into the specified data byte array.
@@ -101,7 +607,7 @@ public:
      * than requested. The amount of bytes read is returned.
      * If zero is returned, the end of file is reached.
      */
-    std::size_t read_once(void * data, std::size_t size) const;
+    std::size_t read_once(byte_view data) const;
 
     /**
      * Writes the given byte array to the file.
@@ -109,7 +615,7 @@ public:
      * than requested. The amount of bytes written is returned.
      * If zero is returned there is insufficient space.
      */
-    std::size_t write_once(const void * data, std::size_t size) const;
+    std::size_t write_once(cbyte_view data) const;
 
     /**
      * Returns the file size.
@@ -454,15 +960,14 @@ namespace zpp::filesystem
 namespace detail
 {
 template <typename File>
-std::size_t basic_file_base<File>::read(void * data,
-                                        std::size_t size) const
+std::size_t basic_file_base<File>::read(byte_view data) const
 {
-    auto byte_data = static_cast<std::byte *>(data);
     std::size_t bytes_read{};
 
-    while (size > bytes_read) {
+    while (data.size() > bytes_read) {
         // Perform a single read.
-        auto result = read_once(byte_data + bytes_read, size - bytes_read);
+        auto result = read_once(
+            {data.data() + bytes_read, data.size() - bytes_read});
 
         // If end of file, return.
         if (!result) {
@@ -477,16 +982,14 @@ std::size_t basic_file_base<File>::read(void * data,
 }
 
 template <typename File>
-std::size_t basic_file_base<File>::write(const void * data,
-                                         std::size_t size) const
+std::size_t basic_file_base<File>::write(cbyte_view data) const
 {
-    auto byte_data = static_cast<const std::byte *>(data);
     std::size_t bytes_written{};
 
-    while (size > bytes_written) {
+    while (data.size() > bytes_written) {
         // Perform a single write.
-        auto result =
-            write_once(byte_data + bytes_written, size - bytes_written);
+        auto result = write_once(
+            {data.data() + bytes_written, data.size() - bytes_written});
 
         // If insufficient space, return.
         if (!result) {
@@ -498,14 +1001,6 @@ std::size_t basic_file_base<File>::write(const void * data,
     }
 
     return bytes_written;
-}
-
-template <typename File>
-template <typename Type>
-std::size_t
-basic_file_base<File>::write(std::basic_string_view<Type> string) const
-{
-    return write(std::data(string), std::size(string) * sizeof(Type));
 }
 
 template <typename File>
@@ -564,7 +1059,7 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
         std::size_t bytes_to_read = data.size() - bytes_read;
 
         // Perform the read operation.
-        auto result = read(data.data() + bytes_read, bytes_to_read);
+        auto result = read({data.data() + bytes_read, bytes_to_read});
 
         // Update the bytes read.
         bytes_read += result;
@@ -592,28 +1087,17 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
 }
 
 template <typename File>
-void basic_file_base<File>::read_exact(void * data, std::size_t size) const
+void basic_file_base<File>::read_exact(byte_view data) const
 {
-    if (auto result = read(data, size); result != size) {
+    if (auto result = read(data); result != data.size()) {
         throw end_of_file_exception(result);
     }
 }
 
 template <typename File>
-void basic_file_base<File>::write_exact(const void * data,
-                                        std::size_t size) const
+void basic_file_base<File>::write_exact(cbyte_view data) const
 {
-    if (auto result = write(data, size); result != size) {
-        throw insufficient_space_exception(result);
-    }
-}
-
-template <typename File>
-template <typename Type>
-void basic_file_base<File>::write_exact(
-    std::basic_string_view<Type> string) const
-{
-    if (auto result = write(string); result != (string.size() * sizeof(Type))) {
+    if (auto result = write(data); result != data.size()) {
         throw insufficient_space_exception(result);
     }
 }
@@ -636,24 +1120,23 @@ static_assert(sizeof(off_t) == sizeof(std::uint64_t) &&
 #endif
 
 template <typename File>
-std::size_t basic_file_base<File>::read_once(void * data,
-                                             std::size_t size) const
+std::size_t basic_file_base<File>::read_once(byte_view data) const
 {
 #ifdef ZPP_FILE_WINDOWS
     // The maximum bytes windows can read at once.
     static constexpr std::size_t max_read_size =
-        (std::numeric_limits<int>::max)();
+        (std::numeric_limits<DWORD>::max)();
 
     // The amount of bytes to read at this time.
     auto bytes_to_read =
-        static_cast<DWORD>((std::min)(size, max_read_size));
+        static_cast<DWORD>((std::min)(data.size(), max_read_size));
 
     // The bytes read.
     DWORD bytes_read{};
 
     // Read from the file.
     auto result = ReadFile(
-        derived().get(), data, bytes_to_read, &bytes_read, nullptr);
+        derived().get(), data.data(), bytes_to_read, &bytes_read, nullptr);
 
     // If failed, throw an error.
     if (!result) {
@@ -668,7 +1151,7 @@ std::size_t basic_file_base<File>::read_once(void * data,
 
     // Perform a read in a non-interruptible manner.
     do {
-        result = ::read(derived().get(), data, size);
+        result = ::read(derived().get(), data.data(), data.size());
     } while (-1 == result && EINTR == errno);
 
     // If failed, throw an error.
@@ -683,24 +1166,26 @@ std::size_t basic_file_base<File>::read_once(void * data,
 }
 
 template <typename File>
-std::size_t basic_file_base<File>::write_once(const void * data,
-                                              std::size_t size) const
+std::size_t basic_file_base<File>::write_once(cbyte_view data) const
 {
 #ifdef ZPP_FILE_WINDOWS
     // The maximum bytes windows can write at once.
     static constexpr std::size_t max_write_size =
-        (std::numeric_limits<int>::max)();
+        (std::numeric_limits<DWORD>::max)();
 
     // The amount of bytes to write at this time.
     auto bytes_to_write =
-        static_cast<DWORD>((std::min)(size, max_write_size));
+        static_cast<DWORD>((std::min)(data.size(), max_write_size));
 
     // The bytes written.
     DWORD bytes_written{};
 
     // Write to the file.
-    auto result = WriteFile(
-        derived().get(), data, bytes_to_write, &bytes_written, nullptr);
+    auto result = WriteFile(derived().get(),
+                            data.data(),
+                            bytes_to_write,
+                            &bytes_written,
+                            nullptr);
 
     // If failed, throw an error.
     if (!result) {
@@ -715,7 +1200,7 @@ std::size_t basic_file_base<File>::write_once(const void * data,
 
     // Perform a write in a non-interruptible manner.
     do {
-        result = ::write(derived().get(), data, size);
+        result = ::write(derived().get(), data.data(), data.size());
     } while (-1 == result && EINTR == errno);
 
     // If failed, throw an error.
