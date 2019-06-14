@@ -184,7 +184,9 @@ public:
     template <typename Pointer,
               // Make sure the other pointer is void type.
               typename = std::enable_if_t<std::is_void_v<
-                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>, typename = void, typename = void>
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>,
+              typename = void,
+              typename = void>
     explicit basic_byte_view(Pointer begin, index_type count) noexcept :
         m_data(static_cast<pointer>(begin)),
         m_size(count)
@@ -194,7 +196,10 @@ public:
     template <typename Pointer,
               // Make sure the other pointer is void type.
               typename = std::enable_if_t<std::is_void_v<
-                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>, typename = void, typename = void, typename = void>
+                  std::remove_cv_t<std::remove_pointer_t<Pointer>>>>,
+              typename = void,
+              typename = void,
+              typename = void>
     explicit basic_byte_view(Pointer begin, Pointer end) noexcept :
         basic_byte_view(
             begin, Pointer(std::uintptr_t(end) - std::uintptr_t(begin)))
@@ -241,7 +246,8 @@ public:
     template <typename OtherByteType,
               typename = std::enable_if_t<
                   !std::is_convertible_v<std::add_pointer_t<OtherByteType>,
-                                         pointer>>, typename = void>
+                                         pointer>>,
+              typename = void>
     basic_byte_view(
         const basic_byte_view<OtherByteType> & other) noexcept :
         m_data(reinterpret_cast<pointer>(other.m_data)),
@@ -255,15 +261,15 @@ public:
      */
     template <typename Type,
               // The pointer type.
-              typename Pointer = decltype(std::declval<Type>().data()),
+              typename Pointer = decltype(std::data(std::declval<Type>())),
 
               // Make sure the container is random access (that together
-              // with a data() member function is probably enough to
+              // with std::data() function is probably enough to
               // require contiguous).
               typename = std::enable_if_t<std::is_base_of_v<
                   std::random_access_iterator_tag,
-                  typename std::iterator_traits<decltype(
-                      std::declval<Type>().begin())>::iterator_category>>,
+                  typename std::iterator_traits<decltype(std::begin(
+                      std::declval<Type>()))>::iterator_category>>,
 
               // Make sure other pointer is pointing to the same type
               // current byte view type.
@@ -283,21 +289,21 @@ public:
                       std::remove_cv_t<std::remove_pointer_t<Pointer>>,
                       std::byte>>>
     constexpr basic_byte_view(Type && value) noexcept :
-        basic_byte_view(value.data(), value.size())
+        basic_byte_view(std::data(value), std::size(value))
     {
     }
 
     template <typename Type,
               // The pointer type.
-              typename Pointer = decltype(std::declval<Type>().data()),
+              typename Pointer = decltype(std::data(std::declval<Type>())),
 
               // Make sure the container is random access (that together
-              // with a data() member function is probably enough to
+              // with std::data() function is probably enough to
               // require contiguous).
               typename = std::enable_if_t<std::is_base_of_v<
                   std::random_access_iterator_tag,
-                  typename std::iterator_traits<decltype(
-                      std::declval<Type>().begin())>::iterator_category>>,
+                  typename std::iterator_traits<decltype(std::begin(
+                      std::declval<Type>()))>::iterator_category>>,
 
               // Make sure other pointer is not pointing to the same type
               // current byte view type.
@@ -315,9 +321,10 @@ public:
                       unsigned char> ||
                   std::is_same_v<
                       std::remove_cv_t<std::remove_pointer_t<Pointer>>,
-                      std::byte>>, typename = void>
+                      std::byte>>,
+              typename = void>
     basic_byte_view(Type && value) noexcept :
-        basic_byte_view(value.data(), value.size())
+        basic_byte_view(std::data(value), std::size(value))
     {
     }
     /**
@@ -330,15 +337,15 @@ public:
      */
     template <typename Type,
               // The pointer type.
-              typename Pointer = decltype(std::declval<Type>().data()),
+              typename Pointer = decltype(std::data(std::declval<Type>())),
 
               // Make sure the container is random access (that together
-              // with a data() member function is probably enough to
+              // with a std::data() function is probably enough to
               // require contiguous).
               typename = std::enable_if_t<std::is_base_of_v<
                   std::random_access_iterator_tag,
-                  typename std::iterator_traits<decltype(
-                      std::declval<Type>().begin())>::iterator_category>>,
+                  typename std::iterator_traits<decltype(std::begin(
+                      std::declval<Type>()))>::iterator_category>>,
 
               // Make sure the other pointer does not point to a byte type.
               typename = std::enable_if_t<
@@ -352,7 +359,7 @@ public:
                       std::remove_cv_t<std::remove_pointer_t<Pointer>>,
                       std::byte>>>
     explicit basic_byte_view(Type && value) noexcept :
-        basic_byte_view(value.data(), value.size())
+        basic_byte_view(std::data(value), std::size(value))
     {
     }
     /**
