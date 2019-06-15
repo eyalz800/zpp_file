@@ -5,7 +5,9 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <system_error>
 #include <type_traits>
 #include <utility>
@@ -1441,12 +1443,63 @@ std::uint64_t basic_file_base<File>::tell() const
 template <typename Char, typename... Arguments>
 file open(const Char * path, Arguments... arguments)
 {
+    static_assert(std::is_same_v<Char, char> ||
+                      std::is_same_v<Char, wchar_t>
+#ifdef __cpp_char8_t
+                      || std::is_same_v<Char, char8_t>
+#endif
+                  ,
+                  "Invalid path type.");
+
 #ifdef ZPP_FILE_WINDOWS
     HANDLE result{};
 
-    // Create the file.
-    if constexpr (std::is_same_v<char, Char>) {
+    // Create file for utf8 strings.
+    auto create_file_utf8 = [](auto path, auto... arguments) {
+        // The path size, including the null terminator.
+        auto path_size = strlen(path) + 1;
+
+        // Check needed size for wide string.
+        auto wide_path_size = MultiByteToWideChar(
+            CP_UTF8, 0, path, static_cast<int>(path_size), nullptr, 0);
+        if (!wide_path_size) {
+            throw std::system_error(GetLastError(),
+                                    std::system_category(),
+                                    "MultiByteToWideChar failed");
+        }
+
+        // Create the wide string.
+        auto wide_path = std::make_unique<wchar_t[]>(wide_path_size);
+
+        // Convert the utf8 into the wide string.
+        if (!MultiByteToWideChar(CP_UTF8,
+                                 0,
+                                 path,
+                                 static_cast<int>(path_size),
+                                 wide_path.get(),
+                                 wide_path_size)) {
+            throw std::system_error(GetLastError(),
+                                    std::system_category(),
+                                    "MultiByteToWideChar failed");
+        }
+
+        // Create the file using the wide path.
+        return CreateFileW(wide_path.get(), arguments...);
+    };
+
+    // If character type is char, open using ASCII or UTF8 depending on the
+    // settings.
+    if constexpr (std::is_same_v<Char, char>) {
+#ifndef ZPP_FILE_OPEN_CHAR_IS_UTF8
         result = CreateFileA(path, arguments...);
+#else
+        result = create_file_utf8(path, arguments...);
+#endif
+#ifdef __cpp_char8_t
+    } else if constexpr (std::is_same_v<Char, char8_t>) {
+        result = create_file_utf8(reinterpret_cast<const char *>(path),
+                                  arguments...);
+#endif
     } else {
         result = CreateFileW(path, arguments...);
     }
@@ -1460,8 +1513,19 @@ file open(const Char * path, Arguments... arguments)
     // Return the file handle.
     return file_handle(result);
 #else
+    int result{};
+
     // Open the file.
-    auto result = ::open(path, arguments...);
+#ifdef __cpp_char8_t
+    if constexpr (std::is_same_v<Char, char8_t>) {
+        result =
+            ::open(reinterpret_cast<const char *>(path), arguments...);
+    } else {
+#endif
+        result = ::open(path, arguments...);
+#ifdef __cpp_char8_t
+    }
+#endif
 
     // If open failed, throw an error.
     if (-1 == result) {
@@ -1503,10 +1567,6 @@ enum class open_mode
 template <typename Char>
 file open(const Char * path, open_mode mode)
 {
-    static_assert(std::is_same_v<Char, char> ||
-                      std::is_same_v<Char, wchar_t>,
-                  "Invalid path type.");
-
 #ifdef ZPP_FILE_WINDOWS
     DWORD desired_access{};
     DWORD creation_disposition{};
@@ -1542,36 +1602,15 @@ file open(const Char * path, open_mode mode)
         break;
     }
 
-    // Create the file.
-    HANDLE result{};
-    if constexpr (std::is_same_v<char, Char>) {
-        result = CreateFileA(path,
-                             desired_access,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE |
-                                 FILE_SHARE_DELETE,
-                             nullptr,
-                             creation_disposition,
-                             FILE_ATTRIBUTE_NORMAL,
-                             nullptr);
-    } else {
-        result = CreateFileW(path,
-                             desired_access,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE |
-                                 FILE_SHARE_DELETE,
-                             nullptr,
-                             creation_disposition,
-                             FILE_ATTRIBUTE_NORMAL,
-                             nullptr);
-    }
-
-    // If file creation failed, throw an error.
-    if (INVALID_HANDLE_VALUE == result) {
-        throw std::system_error(
-            GetLastError(), std::system_category(), "CreateFile failed");
-    }
-
-    // Create the file.
-    file file = file_handle(result);
+    // Open the file.
+    auto file =
+        open(path,
+             desired_access,
+             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+             nullptr,
+             creation_disposition,
+             FILE_ATTRIBUTE_NORMAL,
+             nullptr);
 
     // If append, seek to the end.
     if (append) {
@@ -1605,18 +1644,40 @@ file open(const Char * path, open_mode mode)
     }
 
     // Open the file.
-    auto result = ::open(path, flags);
-
-    // If open failed, throw an error.
-    if (-1 == result) {
-        throw std::system_error(
-            errno, std::system_category(), "open failed");
-    }
-
-    // Return the file descriptor.
-    return file_handle(result);
+    return open(path, flags);
 #endif
 }
+
+/**
+ * Open by string views.
+ * @{
+ */
+template <typename... Arguments>
+file open(std::string_view path, Arguments &&... arguments)
+{
+    return open(path.data(), arguments...);
+}
+
+inline file open(std::string_view path, open_mode mode)
+{
+    return open(path.data(), mode);
+}
+
+#ifdef ZPP_FILE_WINDOWS
+template <typename... Arguments>
+file open(std::wstring_view path, Arguments &&... arguments)
+{
+    return open(path.data(), arguments...);
+}
+
+inline file open(std::wstring_view path, open_mode mode)
+{
+    return open(path.data(), mode);
+}
+#endif
+/**
+ * @}
+ */
 
 } // namespace zpp::filesystem
 
