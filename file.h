@@ -1663,6 +1663,19 @@ inline file open(std::string_view path, open_mode mode)
     return open(path.data(), mode);
 }
 
+#ifdef __cpp_lib_char8_t
+template <typename... Arguments>
+file open(std::u8string_view path, Arguments &&... arguments)
+{
+    return open(path.data(), arguments...);
+}
+
+inline file open(std::u8string_view path, open_mode mode)
+{
+    return open(path.data(), mode);
+}
+#endif
+
 #ifdef ZPP_FILE_WINDOWS
 template <typename... Arguments>
 file open(std::wstring_view path, Arguments &&... arguments)

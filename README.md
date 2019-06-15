@@ -83,7 +83,7 @@ template <typename Char>
 file open(const Char * path, open_mode mode)
 ```
 
-Overloads for `open` with an `std::string_view`/`std::wstring_view` path are also available for convenience.
+Overloads for `open` with `std::string_view` paths are also available for convenience.
 
 For Windows UTF8 support, use either C++20 `char8_t` or define `ZPP_FILE_OPEN_CHAR_IS_UTF8`
 in which case `char` strings are assumed to have UTF8 encoding inside open.
