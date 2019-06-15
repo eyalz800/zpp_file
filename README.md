@@ -83,6 +83,11 @@ template <typename Char>
 file open(const Char * path, open_mode mode)
 ```
 
+Overloads for `open` with an `std::string_view`/`std::wstring_view` path are also available for convenience.
+
+For Windows UTF8 support, use either C++20 `char8_t` or define `ZPP_FILE_OPEN_CHAR_IS_UTF8`
+in which case `char` strings are assumed to have UTF8 encoding inside open.
+
 In order to transfer ownership of a regular file descriptor/handle into
 a `zpp::filesystem::file`, create a `zpp::filesystem::file_handle` from the 
 descriptor/handle and pass it to `zpp::filesystem::file` during construction.
