@@ -1108,8 +1108,22 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
 
         // If we did not finish reading, continue reading.
         if (data.size() < size) {
+            // Calculate the new size.
+            auto new_size = std::uint64_t(data.size()) * 3 / 2;
+
+            // Check if size limit is smaller than 64 bits.
+            if constexpr ((std::numeric_limits<std::size_t>::max)() <
+                          (std::numeric_limits<std::uint64_t>::max)()) {
+                // Check whether the new size is larger than the
+                // implementation capacity.
+                if (new_size > (std::numeric_limits<std::size_t>::max)()) {
+                    throw std::range_error("Amount of file data is too "
+                                           "large for this platform.");
+                }
+            }
+
             // Resize the vector.
-            data.resize(data.size() * 3 / 2);
+            data.resize(std::size_t(new_size));
             continue;
         }
 
