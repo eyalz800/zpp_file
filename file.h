@@ -1056,6 +1056,9 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
         if (!file_size) {
             // Resize to initial size.
             data.resize(initial_vector_size);
+
+            // Set size to the maximum value available on the platform.
+            size = (std::numeric_limits<std::size_t>::max)();
         } else {
             // Get the file offset.
             auto current_offset = tell();
