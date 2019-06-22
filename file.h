@@ -1111,12 +1111,18 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
                                        "large for this platform.");
             }
 
-            // Calculate the new size.
-            auto half_size = (data.size() / 2);
-            auto new_size = half_size * 3;
+            // The new size.
+            std::size_t new_size{};
 
-            // In case of overflow, set the maximum size.
-            if ((new_size / 3) != half_size) {
+            // Limit to resizing by 2/3 factor.
+            constexpr auto resize_factor_limit =
+                (std::numeric_limits<std::size_t>::max)() / 3 * 2;
+
+            // If data size is below resize by factor limit, resize
+            // according to the factor, otherwise, resize to max.
+            if (data.size() < resize_factor_limit) {
+                new_size = data.size() / 2 * 3;
+            } else {
                 new_size = (std::numeric_limits<std::size_t>::max)();
             }
 
