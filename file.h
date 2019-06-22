@@ -1056,9 +1056,6 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
         if (!file_size) {
             // Resize to initial size.
             data.resize(initial_vector_size);
-
-            // Set size to the maximum value available on the platform.
-            size = (std::numeric_limits<std::size_t>::max)();
         } else {
             // Get the file offset.
             auto current_offset = tell();
@@ -1107,23 +1104,24 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
         }
 
         // If we did not finish reading, continue reading.
-        if (data.size() < size) {
-            // Calculate the new size.
-            auto new_size = std::uint64_t(data.size()) * 3 / 2;
+        if ((data.size() < size) || !size) {
+            // If data size is already the maximum size, throw an error.
+            if (data.size() == (std::numeric_limits<std::size_t>::max)()) {
+                throw std::range_error("Amount of file data is too "
+                                       "large for this platform.");
+            }
 
-            // Check if size limit is smaller than 64 bits.
-            if constexpr ((std::numeric_limits<std::size_t>::max)() <
-                          (std::numeric_limits<std::uint64_t>::max)()) {
-                // Check whether the new size is larger than the
-                // implementation capacity.
-                if (new_size > (std::numeric_limits<std::size_t>::max)()) {
-                    throw std::range_error("Amount of file data is too "
-                                           "large for this platform.");
-                }
+            // Calculate the new size.
+            auto new_size = (data.size()) * 3;
+            if ((new_size / 3) != data.size()) {
+                // In case of overflow, set the maximum size.
+                new_size = (std::numeric_limits<std::size_t>::max)();
+            } else {
+                new_size /= 2;
             }
 
             // Resize the vector.
-            data.resize(std::size_t(new_size));
+            data.resize(new_size);
             continue;
         }
 
