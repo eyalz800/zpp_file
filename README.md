@@ -196,3 +196,6 @@ auto get() const;
 auto release();
 ```
 
+Thanks
+------
+- David Sackstein for reviewing and inspiring improvements to this work.
