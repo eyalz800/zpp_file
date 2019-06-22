@@ -593,10 +593,13 @@ public:
     /**
      * Reads all requested bytes, unless the end of file is reached where
      * the reading stops. Returns the data inside a vector of bytes.
-     * If the requested bytes are not specified, or set to zero, the
-     * function reads the entire file.
      */
-    std::vector<std::byte> read(std::size_t size = {}) const;
+    std::vector<std::byte> read(std::size_t size) const;
+
+    /**
+     * Reads the entire file and returns its data.
+     */
+    std::vector<std::byte> read() const;
 
     /**
      * Reads all requested bytes, unless the end of file is reached where
@@ -1039,6 +1042,20 @@ std::size_t basic_file_base<File>::write(cbyte_view data) const
 template <typename File>
 std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
 {
+    // The file data.
+    std::vector<std::byte> data(size);
+
+    // Perform the read operation and resize accordingly.
+    data.resize(read(data));
+
+    // Shrink the data if needed, and return.
+    data.shrink_to_fit();
+    return data;
+}
+
+template <typename File>
+std::vector<std::byte> basic_file_base<File>::read() const
+{
     // In the absence of size and file size, this will be the initial size
     // of the vector.
     constexpr std::size_t initial_vector_size = 0x1000;
@@ -1046,41 +1063,34 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
     // The file data.
     std::vector<std::byte> data;
 
-    // If size is zero, we need to read the entire file,
-    // try to reserve space according to the file size.
-    if (!size) {
-        // Get the file size.
-        auto file_size = this->size();
+    // Get the file size.
+    auto file_size = this->size();
 
-        // If file size cannot be determined, resize to the initial size.
-        if (!file_size) {
-            // Resize to initial size.
-            data.resize(initial_vector_size);
-        } else {
-            // Get the file offset.
-            auto current_offset = tell();
-
-            // If the offset is beyond the size, return immediately.
-            if (current_offset >= file_size) {
-                return data;
-            }
-
-            // Compute the amount of bytes to read.
-            auto data_size = file_size - current_offset;
-
-            // Check whether the data size is larger than the
-            // implementation capacity.
-            if (data_size > (std::numeric_limits<std::size_t>::max)()) {
-                throw std::range_error(
-                    "Amount of file data is too large for this platform.");
-            }
-
-            // Resize to the data size.
-            data.resize(static_cast<std::size_t>(data_size));
-        }
+    // If file size cannot be determined, resize to the initial size.
+    if (!file_size) {
+        // Resize to initial size.
+        data.resize(initial_vector_size);
     } else {
-        // Reserve the requested size.
-        data.resize(size);
+        // Get the file offset.
+        auto current_offset = tell();
+
+        // If the offset is beyond the size, return immediately.
+        if (current_offset >= file_size) {
+            return data;
+        }
+
+        // Compute the amount of bytes to read.
+        auto data_size = file_size - current_offset;
+
+        // Check whether the data size is larger than the
+        // implementation capacity.
+        if (data_size > (std::numeric_limits<std::size_t>::max)()) {
+            throw std::range_error(
+                "Amount of file data is too large for this platform.");
+        }
+
+        // Resize to the data size.
+        data.resize(static_cast<std::size_t>(data_size));
     }
 
     // The amount of bytes read.
@@ -1103,36 +1113,30 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
             break;
         }
 
-        // If we did not finish reading, continue reading.
-        if ((data.size() < size) || !size) {
-            // If data size is already the maximum size, throw an error.
-            if (data.size() == (std::numeric_limits<std::size_t>::max)()) {
-                throw std::range_error("Amount of file data is too "
-                                       "large for this platform.");
-            }
-
-            // The new size.
-            std::size_t new_size{};
-
-            // Limit to resizing by 2/3 factor.
-            constexpr auto resize_factor_limit =
-                (std::numeric_limits<std::size_t>::max)() / 3 * 2;
-
-            // If data size is below resize by factor limit, resize
-            // according to the factor, otherwise, resize to max.
-            if (data.size() < resize_factor_limit) {
-                new_size = data.size() / 2 * 3;
-            } else {
-                new_size = (std::numeric_limits<std::size_t>::max)();
-            }
-
-            // Resize the vector.
-            data.resize(new_size);
-            continue;
+        // If data size is already the maximum size, throw an error.
+        if (data.size() == (std::numeric_limits<std::size_t>::max)()) {
+            throw std::range_error("Amount of file data is too "
+                                   "large for this platform.");
         }
 
-        // Finished reading.
-        break;
+        // The new size.
+        std::size_t new_size{};
+
+        // Limit to resizing by 2/3 factor.
+        constexpr auto resize_factor_limit =
+            (std::numeric_limits<std::size_t>::max)() / 3 * 2;
+
+        // If data size is below resize by factor limit, resize
+        // according to the factor, otherwise, resize to max.
+        if (data.size() < resize_factor_limit) {
+            new_size = data.size() / 2 * 3;
+        } else {
+            new_size = (std::numeric_limits<std::size_t>::max)();
+        }
+
+        // Resize the vector.
+        data.resize(new_size);
+        continue;
     }
 
     // Shrink the data if needed, and return.
