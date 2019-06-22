@@ -1112,12 +1112,12 @@ std::vector<std::byte> basic_file_base<File>::read(std::size_t size) const
             }
 
             // Calculate the new size.
-            auto new_size = (data.size()) * 3;
-            if ((new_size / 3) != data.size()) {
-                // In case of overflow, set the maximum size.
+            auto half_size = (data.size() / 2);
+            auto new_size = half_size * 3;
+
+            // In case of overflow, set the maximum size.
+            if ((new_size / 3) != half_size) {
                 new_size = (std::numeric_limits<std::size_t>::max)();
-            } else {
-                new_size /= 2;
             }
 
             // Resize the vector.
