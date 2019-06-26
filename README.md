@@ -99,24 +99,15 @@ Note: the read and write APIs accept a `zpp::byte_view` or `zpp::cbyte_view` whi
 are similar to span except they implicitly allow all byte types - `char, unsigned char, std::byte`.
 ```cpp
 /**
- * Attempts to read exactly the amount of bytes requested.
- * If not possible, an end_of_file_exception is thrown.
- */
-void read_exact(byte_view data) const;
-
-/**
- * Attempts to write exactly the amount of bytes requested.
- * If not possible, an insufficient_space_exception is thrown.
- */
-void write_exact(cbyte_view data) const;
-
-/**
  * Reads all requested bytes, unless the end of file is reached where
  * the reading stops. Returns the data inside a vector of bytes.
- * If the requested bytes are not specified, or set to zero, the
- * function reads the entire file.
  */
-std::vector<std::byte> read(std::size_t size = {}) const;
+std::vector<std::byte> read(std::size_t size) const;
+
+/**
+ * Reads the entire file and returns its data.
+ */
+std::vector<std::byte> read() const;
 
 /**
  * Reads all requested bytes, unless the end of file is reached where
@@ -129,6 +120,18 @@ std::size_t read(byte_view data) const;
  * less bytes only if there is an insufficient space.
  */
 std::size_t write(cbyte_view data) const;
+
+/**
+ * Attempts to read exactly the amount of bytes requested.
+ * If not possible, an end_of_file_exception is thrown.
+ */
+void read_exact(byte_view data) const;
+
+/**
+ * Attempts to write exactly the amount of bytes requested.
+ * If not possible, an insufficient_space_exception is thrown.
+ */
+void write_exact(cbyte_view data) const;
 
 /**
  * Reads from the file into the specified data byte array.

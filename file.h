@@ -579,18 +579,6 @@ class basic_file_base
 {
 public:
     /**
-     * Attempts to read exactly the amount of bytes requested.
-     * If not possible, an end_of_file_exception is thrown.
-     */
-    void read_exact(byte_view data) const;
-
-    /**
-     * Attempts to write exactly the amount of bytes requested.
-     * If not possible, an insufficient_space_exception is thrown.
-     */
-    void write_exact(cbyte_view data) const;
-
-    /**
      * Reads all requested bytes, unless the end of file is reached where
      * the reading stops. Returns the data inside a vector of bytes.
      */
@@ -612,6 +600,18 @@ public:
      * less bytes only if there is an insufficient space.
      */
     std::size_t write(cbyte_view data) const;
+
+    /**
+     * Attempts to read exactly the amount of bytes requested.
+     * If not possible, an end_of_file_exception is thrown.
+     */
+    void read_exact(byte_view data) const;
+
+    /**
+     * Attempts to write exactly the amount of bytes requested.
+     * If not possible, an insufficient_space_exception is thrown.
+     */
+    void write_exact(cbyte_view data) const;
 
     /**
      * Reads from the file into the specified data byte array.
