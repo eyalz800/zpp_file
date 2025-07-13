@@ -1669,7 +1669,7 @@ file open(const Char * path, open_mode mode)
     }
 
     // Open the file.
-    return open(path, flags | O_CLOEXEC);
+    return open(path, flags | O_CLOEXEC, 0666);
 #endif
 }
 
